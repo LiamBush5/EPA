@@ -1,14 +1,12 @@
-# EPA Comments Scraper
+# EPA Comment Section Analyzer
 
-A tool for scraping and analyzing public comments from regulations.gov, specifically designed for EPA rulemakings.
+This tool analyzes EPA comments to identify which sections of regulatory documents they are addressing.
 
 ## Features
 
-- Scrapes comments from EPA regulations.gov pages, including all comment pages
-- Extracts full comment text and metadata for each comment
-- Handles pagination to collect all comments
-- Saves data in multiple formats (JSON, CSV, Excel)
-- Configurable to limit the number of comments processed
+- Uses OpenAI's GPT models to analyze comment content
+- Maps comments to specific sections of EPA regulatory documents
+- Outputs results in a readable format and optionally saves to JSON
 
 ## Installation
 
@@ -23,52 +21,43 @@ cd EPA
 pip install -r requirements.txt
 ```
 
-3. Copy the example environment file and add your Firecrawl API key:
+3. Copy the example environment file and add your OpenAI API key:
 ```bash
 cp env.example .env
 ```
-Then edit the `.env` file to add your Firecrawl API key.
+Then edit the `.env` file to add your OpenAI API key.
 
 ## Usage
 
-To scrape comments from the default EPA regulation:
+Run the analyzer on your comments JSON file:
 
 ```bash
-python advanced_scraper.py
+python comment_analyzer.py --input output/your_comments_file.json --output analysis_results.json
 ```
 
-To scrape a specific regulation's comments:
+### Parameters
 
-```bash
-python advanced_scraper.py --urls https://www.regulations.gov/document/EPA-HQ-XXXX-YYYY-ZZZZ/comment
+- `--input`, `-i`: (Required) Input JSON file with comments
+- `--output`, `-o`: (Optional) Output JSON file for analysis results
+- `--api-key`: (Optional) OpenAI API key (defaults to OPENAI_API_KEY env var)
+
+## Output Format
+
+For each comment, the tool will print an analysis like:
+
+```
+==================================================
+✅ Comment: EPA-HQ-OLEM-2017-0463-0036
+From: Comment submitted by Colorado Department of Public Health and Environment
+
+Relevant to:
+Section IV.B.2: Proposed Requirements for Puncturing and Draining
+Section VI: Requests for Comment – Worker Safety and SOP Re
+==================================================
 ```
 
-To limit the number of comments processed (useful for testing):
-
-```bash
-python advanced_scraper.py --max-comments 10
-```
-
-To process all available comments:
-
-```bash
-python advanced_scraper.py --max-comments 0
-```
-
-## Output
-
-The script generates the following output files in the `output` directory:
-
-- `epa_[ID]_[TIMESTAMP]_raw.json` - Raw data from the main comments page
-- `epa_[ID]_[TIMESTAMP].md` - Markdown content from the main comments page
-- `epa_[ID]_[TIMESTAMP]_structured.json` - Structured data extracted from all comments
-- `epa_[ID]_[TIMESTAMP].csv` - CSV export of the structured data
-- `epa_[ID]_[TIMESTAMP].xlsx` - Excel export of the structured data
+Results are also saved to the specified output file in JSON format.
 
 ## License
 
-MIT
-
-## Disclaimer
-
-This tool is for educational and research purposes only. Be sure to comply with the terms of service of regulations.gov when using this tool.
+[MIT](LICENSE)
