@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 interface CommentPageProps {
     params: {
         id: string;
-    }
+    };
+    searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export async function generateMetadata({ params }: CommentPageProps): Promise<Metadata> {
