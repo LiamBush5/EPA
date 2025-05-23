@@ -5,14 +5,11 @@ import ReactMarkdown from 'react-markdown';
 
 export const dynamic = 'force-dynamic';
 
-interface CommentPageProps {
-    params: {
-        id: string;
-    };
-    searchParams?: Record<string, string | string[] | undefined>;
-}
-
-export async function generateMetadata({ params }: CommentPageProps): Promise<Metadata> {
+export async function generateMetadata({
+    params
+}: {
+    params: { id: string }
+}): Promise<Metadata> {
     const { comment } = await fetchCommentWithSections(params.id);
 
     return {
@@ -21,7 +18,11 @@ export async function generateMetadata({ params }: CommentPageProps): Promise<Me
     };
 }
 
-export default async function CommentPage({ params }: CommentPageProps) {
+export default async function CommentPage({
+    params
+}: {
+    params: { id: string }
+}) {
     const { comment, sections } = await fetchCommentWithSections(params.id);
 
     if (!comment) {
