@@ -122,7 +122,7 @@ def insert_document_sections(sections, batch_size=10):
 
 def load_document_sections():
     """Load document sections from JSON file and upload to Supabase"""
-    sections_file = 'processed/document_sections.json'
+    sections_file = 'data/processed/epa_sections_fixed.json'
     print(f"Loading document sections from {sections_file}")
 
     try:

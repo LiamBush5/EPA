@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: SectionPageProps): Promise<Me
 
     return {
         title: section ? `${section.section_number} ${section.section_title}` : 'Section Detail',
-        description: section ? `View details and comments for section ${section.section_number}` : 'Section not found',
+        description: section ? `View details and comment matches for section ${section.section_number}` : 'Section not found',
     };
 }
 
@@ -72,10 +72,10 @@ export default async function SectionPage({ params }: SectionPageProps) {
 
                 <div className="space-y-6">
                     <div className="openai-card p-6">
-                        <h2 className="text-lg font-medium mb-4">Comment Statistics</h2>
+                        <h2 className="text-lg font-medium mb-4">Match Statistics</h2>
                         <div className="space-y-4">
                             <div>
-                                <div className="text-sm text-gray-500 mb-1">Total Comments</div>
+                                <div className="text-sm text-gray-500 mb-1">Comment Matches</div>
                                 <div className="text-2xl font-bold text-blue-600">{comments.length}</div>
                             </div>
 
@@ -92,8 +92,8 @@ export default async function SectionPage({ params }: SectionPageProps) {
                             <div className="bg-gray-50 p-3 rounded border border-gray-100">
                                 <p className="text-sm text-gray-600">
                                     {comments.length === 0
-                                        ? 'No comments have been submitted for this section.'
-                                        : `This section has received ${comments.length} comment${comments.length !== 1 ? 's' : ''}, indicating ${comments.length > 10
+                                        ? 'No comments have been matched to this section.'
+                                        : `This section has ${comments.length} comment match${comments.length !== 1 ? 'es' : ''}, indicating ${comments.length > 10
                                             ? 'significant public interest.'
                                             : comments.length > 5
                                                 ? 'moderate public interest.'
@@ -112,7 +112,7 @@ export default async function SectionPage({ params }: SectionPageProps) {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-4">
-                            Our AI has analyzed the comments for this section and identified these key points:
+                            Our AI has analyzed the comments matched to this section and identified these key points:
                         </p>
 
                         {comments.length > 0 ? (
@@ -143,14 +143,14 @@ export default async function SectionPage({ params }: SectionPageProps) {
                                     </div>
                                     <span>
                                         {comments.filter(c => c.has_attachments).length > 0
-                                            ? `${comments.filter(c => c.has_attachments).length} comments include attachments with additional details.`
-                                            : 'No comments include attachments.'}
+                                            ? `${comments.filter(c => c.has_attachments).length} matched comments include attachments with additional details.`
+                                            : 'No matched comments include attachments.'}
                                     </span>
                                 </li>
                             </ul>
                         ) : (
                             <div className="text-sm text-gray-500 italic">
-                                No comments available for analysis.
+                                No comments matched to this section for analysis.
                             </div>
                         )}
                     </div>
@@ -159,9 +159,9 @@ export default async function SectionPage({ params }: SectionPageProps) {
 
             {comments.length > 0 && (
                 <div>
-                    <h2 className="text-2xl font-semibold tracking-tight mb-4">Public Comments</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight mb-4">Matched Comments</h2>
                     <p className="text-gray-600 mb-6">
-                        The following comments have been mapped to this section based on content similarity.
+                        The following comments have been matched to this section based on content similarity. Each comment may be matched to multiple sections.
                     </p>
 
                     <div className="openai-card">

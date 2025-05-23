@@ -51,6 +51,106 @@ def vector_search_similarity(comment_embedding, section_embedding):
 
     return dot_product / (norm1 * norm2)
 
+def build_section_hierarchy(sections):
+    """Build a map of section hierarchy relationships"""
+    # Create a map of section_id to its details
+    section_map = {section['section_id']: section for section in sections}
+
+    # Create parent-child relationships map
+    parent_child_map = {}
+    for section in sections:
+        section_id = section['section_id']
+        parent_id = section.get('parent_section_id')
+
+        if parent_id:
+            if parent_id not in parent_child_map:
+                parent_child_map[parent_id] = []
+            parent_child_map[parent_id].append(section_id)
+
+    # Build a map of each section to all its ancestors
+    ancestor_map = {}
+
+    def get_ancestors(section_id):
+        """Recursively get all ancestors for a section"""
+        if section_id in ancestor_map:
+            return ancestor_map[section_id]
+
+        ancestors = []
+        section = section_map.get(section_id)
+        if not section:
+            return []
+
+        parent_id = section.get('parent_section_id')
+        if parent_id:
+            ancestors.append(parent_id)
+            ancestors.extend(get_ancestors(parent_id))
+
+        ancestor_map[section_id] = ancestors
+        return ancestors
+
+    # Populate ancestor map for all sections
+    for section_id in section_map:
+        if section_id not in ancestor_map:
+            ancestor_map[section_id] = get_ancestors(section_id)
+
+    return section_map, parent_child_map, ancestor_map
+
+def filter_hierarchical_matches(matches, section_map, ancestor_map):
+    """Filter matches to avoid parent-child redundancy"""
+    # Group matches by comment
+    comment_matches = {}
+    for match in matches:
+        comment_id = match['comment_id']
+        if comment_id not in comment_matches:
+            comment_matches[comment_id] = []
+        comment_matches[comment_id].append(match)
+
+    # Process each comment's matches
+    filtered_matches = []
+    for comment_id, matches in comment_matches.items():
+        # Sort by similarity score (descending)
+        sorted_matches = sorted(matches, key=lambda x: x['similarity_score'], reverse=True)
+
+        # Keep track of which sections we've already covered
+        covered_sections = set()
+
+        for match in sorted_matches:
+            section_id = match['section_id']
+
+            # Skip if this section or any of its ancestors/descendants are already covered
+            if section_id in covered_sections:
+                continue
+
+            # Get all ancestors of this section
+            ancestors = ancestor_map.get(section_id, [])
+
+            # If any ancestor is already covered, skip this match (unless this match is significantly better)
+            should_skip = False
+            for ancestor in ancestors:
+                if ancestor in covered_sections:
+                    # Check if this match is significantly better than the ancestor's match
+                    # (e.g., at least 10% higher similarity)
+                    ancestor_match = next((m for m in filtered_matches if
+                                          m['comment_id'] == comment_id and
+                                          m['section_id'] == ancestor), None)
+
+                    if ancestor_match and match['similarity_score'] <= ancestor_match['similarity_score'] * 1.1:
+                        should_skip = True
+                        break
+
+            if not should_skip:
+                # Add this match
+                filtered_matches.append(match)
+
+                # Mark this section as covered
+                covered_sections.add(section_id)
+
+                # Also mark all ancestors as covered to avoid redundancy
+                for ancestor in ancestors:
+                    covered_sections.add(ancestor)
+
+    return filtered_matches
+
 def match_comments_to_sections(threshold=0.75, max_matches=5):
     """Match EPA comments to document sections based on vector similarity"""
     print("Fetching comments from Supabase...")
@@ -62,6 +162,10 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
     sections = sections_response.data
 
     print(f"Matching {len(comments)} comments to {len(sections)} sections...")
+
+    # Build section hierarchy maps
+    print("Building section hierarchy maps...")
+    section_map, parent_child_map, ancestor_map = build_section_hierarchy(sections)
 
     # Create a list to store matches
     all_matches = []
@@ -106,12 +210,16 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
                 'similarity_score': match['similarity_score']
             })
 
-    print(f"Found {len(all_matches)} comment-section matches above threshold {threshold}")
+    print(f"Found {len(all_matches)} raw comment-section matches above threshold {threshold}")
+
+    # Filter matches to avoid parent-child redundancy
+    filtered_matches = filter_hierarchical_matches(all_matches, section_map, ancestor_map)
+    print(f"After hierarchical filtering: {len(filtered_matches)} unique matches")
 
     # Upload matches to Supabase
-    upload_matches_to_supabase(all_matches)
+    upload_matches_to_supabase(filtered_matches)
 
-    return all_matches
+    return filtered_matches
 
 def upload_matches_to_supabase(matches, batch_size=50):
     """Upload comment-section matches to Supabase"""

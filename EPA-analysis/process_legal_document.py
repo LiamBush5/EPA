@@ -326,6 +326,141 @@ def extract_sections(markdown_text):
 
     return sections
 
+def extract_epa_sections(markdown_text):
+    """
+    Extract specifically the 7 main sections from EPA Federal Register documents.
+    """
+    # Define patterns to match the EPA document's main section headers
+    main_section_pattern = r'# ([IVXLCDM]+)\.\s+([^\n]+)'  # Matches patterns like "# I. General Information"
+    sub_section_pattern = r'# ([A-Z])\.\s+([^\n]+)'  # Matches patterns like "# A. Does this action apply to me?"
+
+    # Prepare sections list
+    sections = []
+
+    # Split the markdown by pages
+    pages = re.split(r'---\n', markdown_text)
+    text = '\n'.join(pages)
+    text = re.sub(r'\r\n', '\n', text)
+
+    # Find all main sections using regex
+    main_sections = re.finditer(main_section_pattern, text)
+
+    # Get the positions of all section headers
+    main_section_positions = []
+    for match in main_sections:
+        section_number = match.group(1)
+        section_title = match.group(2).strip()
+        start_pos = match.start()
+        main_section_positions.append((start_pos, section_number, section_title))
+
+    # Sort by position in document
+    main_section_positions.sort()
+
+    # Find all subsections using regex
+    sub_sections = re.finditer(sub_section_pattern, text)
+    sub_section_positions = []
+    for match in sub_sections:
+        section_number = match.group(1)
+        section_title = match.group(2).strip()
+        start_pos = match.start()
+        sub_section_positions.append((start_pos, section_number, section_title))
+
+    # Sort subsections by position
+    sub_section_positions.sort()
+
+    # Extract main sections text by determining where each section ends
+    parent_sections = {}  # Store section_id by section number for parent lookup
+
+    for i, (start_pos, section_number, section_title) in enumerate(main_section_positions):
+        # Determine where this section ends
+        if i < len(main_section_positions) - 1:
+            end_pos = main_section_positions[i+1][0]
+        else:
+            # For the last section, find regulatory text or end of document
+            regulatory_text = re.search(r'# PART \d+--', text[start_pos:])
+            if regulatory_text:
+                end_pos = start_pos + regulatory_text.start()
+            else:
+                end_pos = len(text)
+
+        # Extract section text
+        section_text = text[start_pos:end_pos].strip()
+
+        # Create section object
+        section_id = str(uuid.uuid4())
+        section = {
+            'section_id': section_id,
+            'section_number': section_number,
+            'section_title': section_title,
+            'section_text': section_text,
+            'hierarchy_level': 1,
+            'parent_section_id': None
+        }
+
+        sections.append(section)
+        parent_sections[section_number] = section_id
+
+    # Process subsections and assign them to correct parent sections
+    for sub_start_pos, sub_section_number, sub_section_title in sub_section_positions:
+        # Find the parent section for this subsection
+        parent_section_id = None
+        parent_section_pos = -1
+        parent_section_num = None
+
+        # Find which main section this subsection belongs to
+        for main_start_pos, main_section_number, _ in main_section_positions:
+            if main_start_pos < sub_start_pos and main_start_pos > parent_section_pos:
+                parent_section_pos = main_start_pos
+                parent_section_num = main_section_number
+
+        if parent_section_num and parent_section_num in parent_sections:
+            parent_section_id = parent_sections[parent_section_num]
+
+        # Find where this subsection ends
+        # Default to end of document
+        end_pos = len(text)
+
+        # Check if there's another subsection after this one
+        for other_pos, _, _ in sub_section_positions:
+            if other_pos > sub_start_pos and other_pos < end_pos:
+                end_pos = other_pos
+
+        # Check if there's a main section after this subsection
+        for other_pos, _, _ in main_section_positions:
+            if other_pos > sub_start_pos and other_pos < end_pos:
+                end_pos = other_pos
+
+        # Extract subsection text
+        subsection_text = text[sub_start_pos:end_pos].strip()
+
+        # Create subsection object
+        subsection = {
+            'section_id': str(uuid.uuid4()),
+            'section_number': sub_section_number,
+            'section_title': sub_section_title,
+            'section_text': subsection_text,
+            'hierarchy_level': 2,
+            'parent_section_id': parent_section_id
+        }
+
+        sections.append(subsection)
+
+    # Add regulatory text section if it exists
+    regulatory_match = re.search(r'(# PART \d+--.*?)(?=$)', text, re.DOTALL)
+    if regulatory_match:
+        regulatory_text = regulatory_match.group(1).strip()
+        regulatory_section = {
+            'section_id': str(uuid.uuid4()),
+            'section_number': 'VIII',  # Assign as section 8
+            'section_title': 'Regulatory Text Amendments',
+            'section_text': regulatory_text,
+            'hierarchy_level': 1,
+            'parent_section_id': None
+        }
+        sections.append(regulatory_section)
+
+    return sections
+
 def clean_sections(sections):
     """
     Clean up sections by removing very short sections and merging closely related ones.
@@ -349,6 +484,29 @@ def clean_sections(sections):
 
     return cleaned_sections
 
+def fix_section_hierarchy(sections):
+    """
+    Fix the hierarchy of sections, specifically for EPA documents where sections C and D
+    should be subsections of section I.
+    """
+    # Find section I
+    section_i_id = None
+    for section in sections:
+        if section['section_number'] == 'I' and section['hierarchy_level'] == 1:
+            section_i_id = section['section_id']
+            break
+
+    # If we found section I, look for standalone sections C and D that should be its children
+    if section_i_id:
+        for section in sections:
+            # Find top-level C and D sections
+            if section['section_number'] in ['C', 'D'] and section['hierarchy_level'] == 1:
+                # Set them as children of section I
+                section['parent_section_id'] = section_i_id
+                section['hierarchy_level'] = 2
+
+    return sections
+
 def main():
     parser = argparse.ArgumentParser(description='Process legal document into structured sections')
     parser.add_argument('input_file', help='Path to the markdown file to process')
@@ -364,22 +522,25 @@ def main():
     with open(args.input_file, 'r', encoding='utf-8') as f:
         markdown_text = f.read()
 
-    # Extract sections
-    sections = extract_sections(markdown_text)
+    # Extract sections - use the EPA-specific extractor
+    sections = extract_epa_sections(markdown_text)
 
     # Clean and optimize sections
     cleaned_sections = clean_sections(sections)
 
+    # Fix hierarchy for sections C and D
+    fixed_sections = fix_section_hierarchy(cleaned_sections)
+
     # Save to JSON
     with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(cleaned_sections, f, indent=2)
+        json.dump(fixed_sections, f, indent=2)
 
-    print(f"Processed {len(cleaned_sections)} sections from document")
+    print(f"Processed {len(fixed_sections)} sections from document")
     print(f"Output saved to {args.output}")
 
     # Print hierarchy level summary
     level_counts = {}
-    for section in cleaned_sections:
+    for section in fixed_sections:
         level = section['hierarchy_level']
         level_counts[level] = level_counts.get(level, 0) + 1
 

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { fetchDocumentSections, fetchCommentSectionMatches } from '../../lib/supabase';
+import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../../lib/supabase';
 import DocumentStructure from '../../components/DocumentStructure';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function DocumentPage() {
     const sections = await fetchDocumentSections();
     const matches = await fetchCommentSectionMatches();
+    const comments = await fetchComments();
 
     // Calculate the number of comments per section
     const commentCountBySection = matches.reduce((acc, match) => {
@@ -16,10 +17,11 @@ export default async function DocumentPage() {
 
     // Calculate some statistics
     const totalSections = sections.length;
+    const totalUniqueComments = comments.length;
+    const totalMatches = matches.length;
     const sectionsWithComments = Object.keys(commentCountBySection).length;
-    const totalComments = matches.length;
-    const averageCommentsPerSection = sectionsWithComments > 0
-        ? (totalComments / sectionsWithComments).toFixed(1)
+    const averageMatchesPerComment = totalUniqueComments > 0
+        ? (totalMatches / totalUniqueComments).toFixed(1)
         : '0';
 
     return (
@@ -38,7 +40,7 @@ export default async function DocumentPage() {
                 <h1 className="text-3xl font-semibold tracking-tight mb-4">Document Structure Analysis</h1>
                 <p className="text-gray-600 mb-8 max-w-3xl">
                     This view shows the complete structure of the EPA document with AI-powered analysis of comment patterns.
-                    Explore sections to see detailed comments and insights.
+                    Each section displays the number of comment matches it has received.
                 </p>
             </div>
 
@@ -50,17 +52,17 @@ export default async function DocumentPage() {
 
                 <div className="openai-card p-6 flex flex-col items-center">
                     <div className="text-3xl font-bold text-blue-600 mb-2">{sectionsWithComments}</div>
-                    <div className="text-sm text-gray-600 text-center">Sections with Comments</div>
+                    <div className="text-sm text-gray-600 text-center">Sections w/ Matches</div>
                 </div>
 
                 <div className="openai-card p-6 flex flex-col items-center">
-                    <div className="text-3xl font-bold text-blue-600 mb-2">{totalComments}</div>
-                    <div className="text-sm text-gray-600 text-center">Total Comments</div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{totalUniqueComments}</div>
+                    <div className="text-sm text-gray-600 text-center">Unique Comments</div>
                 </div>
 
                 <div className="openai-card p-6 flex flex-col items-center">
-                    <div className="text-3xl font-bold text-blue-600 mb-2">{averageCommentsPerSection}</div>
-                    <div className="text-sm text-gray-600 text-center">Avg. Comments per Section</div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{totalMatches}</div>
+                    <div className="text-sm text-gray-600 text-center">Total Matches</div>
                 </div>
             </div>
 
@@ -79,7 +81,7 @@ export default async function DocumentPage() {
                 </div>
 
                 <p className="text-gray-600 mb-4">
-                    Our AI has analyzed the distribution of comments across document sections and identified potential patterns:
+                    Our AI has analyzed how comments match to different document sections and identified patterns:
                 </p>
 
                 <ul className="space-y-3 mb-6">
@@ -91,8 +93,8 @@ export default async function DocumentPage() {
                         </div>
                         <span className="text-gray-700">
                             {sectionsWithComments > 0 ?
-                                `${Math.round((sectionsWithComments / totalSections) * 100)}% of document sections have received public comments.` :
-                                'No sections have received comments yet.'}
+                                `${Math.round((sectionsWithComments / totalSections) * 100)}% of document sections have received at least one comment match.` :
+                                'No sections have received comment matches yet.'}
                         </span>
                     </li>
                     <li className="flex items-start">
@@ -102,7 +104,7 @@ export default async function DocumentPage() {
                             </svg>
                         </div>
                         <span className="text-gray-700">
-                            The most commented sections tend to be those related to regulatory requirements and implementation timelines.
+                            On average, each comment is matched to {averageMatchesPerComment} different sections of the document.
                         </span>
                     </li>
                     <li className="flex items-start">

@@ -59,7 +59,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
         return (
             <ul className={`space-y-1 ${level > 0 ? 'pl-5' : ''}`}>
                 {Object.values(tree).map((section: any) => {
-                    const commentCount = commentCounts[section.section_id] || 0;
+                    const matchCount = commentCounts[section.section_id] || 0;
                     const hasChildren = Object.keys(section.children).length > 0;
 
                     return (
@@ -78,9 +78,9 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
                                     )}
                                     <span className="text-sm text-gray-500 mr-2">{section.section_number}</span>
                                     <span className="text-sm font-medium flex-1">{section.section_title}</span>
-                                    {commentCount > 0 && (
+                                    {matchCount > 0 && (
                                         <span className="openai-badge openai-badge-blue ml-2">
-                                            {commentCount}
+                                            {matchCount}
                                         </span>
                                     )}
                                 </Link>
@@ -99,7 +99,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
             <div className="mb-6">
                 <h3 className="text-lg font-medium mb-2">Document Structure</h3>
                 <p className="text-sm text-gray-500">
-                    Explore the hierarchical structure of the document. Sections with comments are highlighted with a count badge.
+                    Explore the hierarchical structure of the document. The numbers show how many comment matches each section has received.
                 </p>
             </div>
             {renderSectionTree(sectionTree)}

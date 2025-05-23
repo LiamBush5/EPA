@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { fetchDocumentSections, fetchCommentSectionMatches } from '../lib/supabase';
+import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../lib/supabase';
 import DocumentStructure from '../components/DocumentStructure';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   const sections = await fetchDocumentSections();
   const matches = await fetchCommentSectionMatches();
+  const comments = await fetchComments();
 
   // Calculate the number of comments per section
   const commentCountBySection = matches.reduce((acc, match) => {
@@ -24,10 +25,11 @@ export default async function Home() {
     .slice(0, 5);
 
   // Calculate statistics
-  const totalComments = matches.length;
+  const totalUniqueComments = comments.length;
+  const totalMatches = matches.length;
   const sectionsWithComments = Object.keys(commentCountBySection).length;
-  const averageCommentsPerSection = sectionsWithComments > 0
-    ? (totalComments / sectionsWithComments).toFixed(1)
+  const averageMatchesPerComment = totalUniqueComments > 0
+    ? (totalMatches / totalUniqueComments).toFixed(1)
     : '0';
 
   return (
@@ -41,13 +43,10 @@ export default async function Home() {
           <p className="text-xl text-gray-600 mb-8">
             Identify patterns, analyze feedback, and understand public comments on EPA documents
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <Link href="/document" className="openai-button">
               Explore Document Structure
             </Link>
-            <button className="openai-button-secondary">
-              Learn More
-            </button>
           </div>
         </div>
       </section>
@@ -61,18 +60,18 @@ export default async function Home() {
           </div>
 
           <div className="openai-card p-6 text-center">
-            <h3 className="text-3xl font-bold text-blue-600 mb-2">{sectionsWithComments}</h3>
-            <p className="text-gray-600">Sections with Comments</p>
+            <h3 className="text-3xl font-bold text-blue-600 mb-2">{totalUniqueComments}</h3>
+            <p className="text-gray-600">Unique Comments</p>
           </div>
 
           <div className="openai-card p-6 text-center">
-            <h3 className="text-3xl font-bold text-blue-600 mb-2">{totalComments}</h3>
-            <p className="text-gray-600">Total Comments</p>
+            <h3 className="text-3xl font-bold text-blue-600 mb-2">{totalMatches}</h3>
+            <p className="text-gray-600">Comment-Section Matches</p>
           </div>
 
           <div className="openai-card p-6 text-center">
-            <h3 className="text-3xl font-bold text-blue-600 mb-2">{averageCommentsPerSection}</h3>
-            <p className="text-gray-600">Avg. Comments per Section</p>
+            <h3 className="text-3xl font-bold text-blue-600 mb-2">{averageMatchesPerComment}</h3>
+            <p className="text-gray-600">Avg. Sections per Comment</p>
           </div>
         </div>
       </section>
@@ -102,7 +101,7 @@ export default async function Home() {
           </div>
           <h3 className="text-xl font-semibold mb-3">Comment Analysis</h3>
           <p className="text-gray-600 mb-5">
-            AI-powered analysis of public comments reveals patterns, concerns, and sentiment across different sections of regulatory documents.
+            AI-powered analysis identifies which sections each comment relates to, with each comment potentially matching multiple sections.
           </p>
           <Link href={`/sections/${topSections[0]?.section_id || ''}`} className="text-blue-600 font-medium hover:underline">
             Explore Top Comments →
@@ -131,7 +130,7 @@ export default async function Home() {
                     <p className="text-gray-600 text-sm mt-1 line-clamp-2">{section.section_text}</p>
                   </div>
                   <div className="openai-badge openai-badge-blue ml-4 flex items-center whitespace-nowrap">
-                    {section.commentCount} comment{section.commentCount !== 1 ? 's' : ''}
+                    {section.commentCount} match{section.commentCount !== 1 ? 'es' : ''}
                   </div>
                 </Link>
               </li>
