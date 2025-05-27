@@ -26,6 +26,8 @@ export interface Comment {
     comment_text: string;
     has_attachments: boolean;
     attachment_count: number;
+    attachment_contents?: Array<{ filename: string; text: string }>;
+    combined_text?: string;
     source_url: string;
 }
 
@@ -54,7 +56,7 @@ export async function fetchDocumentSections() {
 export async function fetchComments() {
     const { data, error } = await supabase
         .from('epa_comments')
-        .select('*');
+        .select('*, attachment_contents');
 
     if (error) {
         console.error('Error fetching comments:', error);
@@ -124,7 +126,7 @@ export async function fetchSectionWithComments(sectionId: string) {
 
     const { data: comments, error: commentsError } = await supabase
         .from('epa_comments')
-        .select('*')
+        .select('*, attachment_contents')
         .in('comment_id', commentIds);
 
     if (commentsError) {
@@ -149,7 +151,7 @@ export async function fetchCommentWithSections(commentId: string) {
     // Fetch the comment
     const { data: comment, error: commentError } = await supabase
         .from('epa_comments')
-        .select('*')
+        .select('*, attachment_contents')
         .eq('comment_id', commentId)
         .single();
 
@@ -198,4 +200,84 @@ export async function fetchCommentWithSections(commentId: string) {
     }).sort((a, b) => b.similarity_score - a.similarity_score);
 
     return { comment, sections: sectionsWithScores };
+}
+
+export async function fetchSectionWithBestMatchedComments(sectionId: string) {
+    // Fetch the section
+    const { data: section, error: sectionError } = await supabase
+        .from('document_sections')
+        .select('*')
+        .eq('section_id', sectionId)
+        .single();
+
+    if (sectionError) {
+        console.error('Error fetching section:', sectionError);
+        return { section: null, comments: [] };
+    }
+
+    // Fetch ALL comments and their matches to determine best matches
+    const { data: allComments, error: commentsError } = await supabase
+        .from('epa_comments')
+        .select('*, attachment_contents');
+
+    if (commentsError) {
+        console.error('Error fetching comments:', commentsError);
+        return { section, comments: [] };
+    }
+
+    const { data: allMatches, error: matchesError } = await supabase
+        .from('comment_section_matches')
+        .select('*');
+
+    if (matchesError) {
+        console.error('Error fetching matches:', matchesError);
+        return { section, comments: [] };
+    }
+
+    const { data: allSections, error: sectionsError } = await supabase
+        .from('document_sections')
+        .select('*');
+
+    if (sectionsError) {
+        console.error('Error fetching sections:', sectionsError);
+        return { section, comments: [] };
+    }
+
+    // Import the single match logic
+    const { findSingleBestMatch } = await import('./singleMatchLogic');
+
+    // Find comments where this section is their best match
+    const bestMatchedComments = allComments
+        .map(comment => {
+            // Get all matches for this comment
+            const commentMatches = allMatches.filter(match => match.comment_id === comment.comment_id);
+
+            // Convert to the format expected by findSingleBestMatch
+            const sectionsWithScores = commentMatches.map(match => {
+                const matchedSection = allSections.find(s => s.section_id === match.section_id);
+                return matchedSection ? {
+                    ...matchedSection,
+                    similarity_score: match.similarity_score,
+                    match_rank: match.match_rank
+                } : null;
+            }).filter(Boolean);
+
+            // Find the single best match
+            const bestMatch = findSingleBestMatch(comment, allSections, sectionsWithScores);
+
+            // Return the comment if this section is its best match
+            if (bestMatch && bestMatch.section_id === sectionId) {
+                return {
+                    ...comment,
+                    similarity_score: bestMatch.similarity_score,
+                    match_rank: 1 // Since it's the best match
+                };
+            }
+
+            return null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.similarity_score - a.similarity_score);
+
+    return { section, comments: bestMatchedComments };
 }

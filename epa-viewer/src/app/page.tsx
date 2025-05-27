@@ -1,16 +1,44 @@
 import Link from 'next/link';
 import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../lib/supabase';
+import { findSingleBestMatch } from '../lib/singleMatchLogic';
 import DocumentStructure from '../components/DocumentStructure';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const sections = await fetchDocumentSections();
-  const matches = await fetchCommentSectionMatches();
+  const rawMatches = await fetchCommentSectionMatches();
   const comments = await fetchComments();
 
-  // Calculate the number of comments per section
-  const commentCountBySection = matches.reduce((acc, match) => {
+  // Apply single best match logic to each comment
+  const singleBestMatches = comments
+    .map(comment => {
+      // Get all matches for this comment
+      const commentMatches = rawMatches.filter(match => match.comment_id === comment.comment_id);
+
+      // Convert to the format expected by findSingleBestMatch
+      const sectionsWithScores = commentMatches.map(match => {
+        const section = sections.find(s => s.section_id === match.section_id);
+        return section ? {
+          ...section,
+          similarity_score: match.similarity_score,
+          match_rank: match.match_rank
+        } : null;
+      }).filter(Boolean);
+
+      // Find the single best match
+      const bestMatch = findSingleBestMatch(comment, sections, sectionsWithScores);
+
+      return bestMatch ? {
+        comment_id: comment.comment_id,
+        section_id: bestMatch.section_id,
+        similarity_score: bestMatch.similarity_score
+      } : null;
+    })
+    .filter(Boolean);
+
+  // Calculate the number of comments per section using single best matches
+  const commentCountBySection = singleBestMatches.reduce((acc, match) => {
     acc[match.section_id] = (acc[match.section_id] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -26,7 +54,7 @@ export default async function Home() {
 
   // Calculate statistics
   const totalUniqueComments = comments.length;
-  const totalMatches = matches.length;
+  const totalMatches = singleBestMatches.length;
   const sectionsWithComments = Object.keys(commentCountBySection).length;
   const averageMatchesPerComment = totalUniqueComments > 0
     ? (totalMatches / totalUniqueComments).toFixed(1)
@@ -101,7 +129,7 @@ export default async function Home() {
           </div>
           <h3 className="text-xl font-semibold mb-3">Comment Analysis</h3>
           <p className="text-gray-600 mb-5">
-            AI-powered analysis identifies which sections each comment relates to, with each comment potentially matching multiple sections.
+            Enhanced AI analysis identifies the single best section match for each comment, with explicit reference detection and improved precision.
           </p>
           <Link href={`/sections/${topSections[0]?.section_id || ''}`} className="text-blue-600 font-medium hover:underline">
             Explore Top Comments →

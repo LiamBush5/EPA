@@ -88,6 +88,37 @@
     @apply bg-green-100 text-green-800;
   }
 
+  /* Annotation System Styles */
+  .annotation-ref {
+    @apply relative cursor-pointer;
+    border-bottom: 2px dotted #3b82f6;
+    transition: all 0.2s ease;
+  }
+
+  .annotation-ref:hover {
+    @apply bg-blue-50;
+    border-bottom-color: #1d4ed8;
+  }
+
+  .annotation-number {
+    @apply text-blue-600 font-medium ml-1;
+    font-size: 0.7em;
+  }
+
+  .annotation-ref.active {
+    @apply bg-blue-100;
+    border-bottom-color: #1d4ed8;
+  }
+
+  .annotation-item.highlighted {
+    @apply border-blue-500 bg-blue-50;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+
+  .border-l-3 {
+    border-left-width: 3px;
+  }
+
   .openai-container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }

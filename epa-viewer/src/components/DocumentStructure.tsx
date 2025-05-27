@@ -7,6 +7,19 @@ interface DocumentStructureProps {
 }
 
 const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) => {
+    // Separate special sections that should appear at the end
+    const specialSections = ['REGULATORY_TEXT', 'FOOTNOTES'];
+
+    // Filter out special sections from main structure
+    const mainSections = sections.filter(section =>
+        !specialSections.includes(section.section_number)
+    );
+
+    // Get special sections to display at the end
+    const endSections = sections.filter(section =>
+        specialSections.includes(section.section_number)
+    );
+
     // Function to build a hierarchical tree from flat sections array
     const buildTree = (sections: DocumentSection[]) => {
         const tree: Record<string, any> = {};
@@ -52,7 +65,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
         return tree;
     };
 
-    const sectionTree = buildTree(sections);
+    const sectionTree = buildTree(mainSections);
 
     // Recursive component to render the tree
     const renderSectionTree = (tree: Record<string, any>, level: number = 0) => {
@@ -94,6 +107,40 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
         );
     };
 
+    // Component to render special sections at the end
+    const renderEndSections = () => {
+        if (endSections.length === 0) return null;
+
+        return (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+                <ul className="space-y-1">
+                    {endSections.map((section) => {
+                        const matchCount = commentCounts[section.section_id] || 0;
+
+                        return (
+                            <li key={section.section_id} className="py-2">
+                                <div className="flex items-center">
+                                    <Link
+                                        href={`/sections/${section.section_id}`}
+                                        className="group flex-1 flex items-center text-gray-900 hover:text-blue-600 transition-colors"
+                                    >
+                                        <span className="text-sm text-gray-500 mr-2">{section.section_number}</span>
+                                        <span className="text-sm font-medium flex-1">{section.section_title}</span>
+                                        {matchCount > 0 && (
+                                            <span className="openai-badge openai-badge-blue ml-2">
+                                                {matchCount}
+                                            </span>
+                                        )}
+                                    </Link>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
+        );
+    };
+
     return (
         <div className="openai-card p-6">
             <div className="mb-6">
@@ -103,6 +150,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
                 </p>
             </div>
             {renderSectionTree(sectionTree)}
+            {renderEndSections()}
         </div>
     );
 };

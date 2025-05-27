@@ -1,16 +1,44 @@
 import Link from 'next/link';
 import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../../lib/supabase';
+import { findSingleBestMatch } from '../../lib/singleMatchLogic';
 import DocumentStructure from '../../components/DocumentStructure';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DocumentPage() {
     const sections = await fetchDocumentSections();
-    const matches = await fetchCommentSectionMatches();
+    const rawMatches = await fetchCommentSectionMatches();
     const comments = await fetchComments();
 
-    // Calculate the number of comments per section
-    const commentCountBySection = matches.reduce((acc, match) => {
+    // Apply single best match logic to each comment
+    const singleBestMatches = comments
+        .map(comment => {
+            // Get all matches for this comment
+            const commentMatches = rawMatches.filter(match => match.comment_id === comment.comment_id);
+
+            // Convert to the format expected by findSingleBestMatch
+            const sectionsWithScores = commentMatches.map(match => {
+                const section = sections.find(s => s.section_id === match.section_id);
+                return section ? {
+                    ...section,
+                    similarity_score: match.similarity_score,
+                    match_rank: match.match_rank
+                } : null;
+            }).filter(Boolean);
+
+            // Find the single best match
+            const bestMatch = findSingleBestMatch(comment, sections, sectionsWithScores);
+
+            return bestMatch ? {
+                comment_id: comment.comment_id,
+                section_id: bestMatch.section_id,
+                similarity_score: bestMatch.similarity_score
+            } : null;
+        })
+        .filter(Boolean);
+
+    // Calculate the number of comments per section using single best matches
+    const commentCountBySection = singleBestMatches.reduce((acc, match) => {
         acc[match.section_id] = (acc[match.section_id] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
@@ -18,7 +46,7 @@ export default async function DocumentPage() {
     // Calculate some statistics
     const totalSections = sections.length;
     const totalUniqueComments = comments.length;
-    const totalMatches = matches.length;
+    const totalMatches = singleBestMatches.length;
     const sectionsWithComments = Object.keys(commentCountBySection).length;
     const averageMatchesPerComment = totalUniqueComments > 0
         ? (totalMatches / totalUniqueComments).toFixed(1)
@@ -39,8 +67,8 @@ export default async function DocumentPage() {
 
                 <h1 className="text-3xl font-semibold tracking-tight mb-4">Document Structure Analysis</h1>
                 <p className="text-gray-600 mb-8 max-w-3xl">
-                    This view shows the complete structure of the EPA document with AI-powered analysis of comment patterns.
-                    Each section displays the number of comment matches it has received.
+                    This view shows the complete structure of the EPA document with enhanced AI-powered analysis.
+                    Each section displays the number of comments that have been matched to it as their primary section.
                 </p>
             </div>
 
@@ -104,7 +132,7 @@ export default async function DocumentPage() {
                             </svg>
                         </div>
                         <span className="text-gray-700">
-                            On average, each comment is matched to {averageMatchesPerComment} different sections of the document.
+                            Each comment is matched to exactly {averageMatchesPerComment} section (its single best match) for precise categorization.
                         </span>
                     </li>
                     <li className="flex items-start">

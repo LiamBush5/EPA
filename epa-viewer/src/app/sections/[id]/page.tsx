@@ -1,13 +1,15 @@
 import Link from 'next/link';
-import { fetchSectionWithComments } from '../../../lib/supabase';
+import { fetchSectionWithBestMatchedComments } from '../../../lib/supabase';
 import { Metadata } from 'next';
 import ReactMarkdown from 'react-markdown';
+import { detectExplicitReferences, highlightReferences, findExactTextMatches, highlightExactMatches } from '../../../lib/referenceDetection';
+import AttachmentContent from '../../../components/AttachmentContent';
 
 export const dynamic = 'force-dynamic';
 
 // @ts-ignore - Temporarily bypassing type check for deployment
 export async function generateMetadata({ params }) {
-    const { section } = await fetchSectionWithComments(params.id);
+    const { section } = await fetchSectionWithBestMatchedComments(params.id);
 
     return {
         title: section ? `${section.section_number} ${section.section_title}` : 'Section Detail',
@@ -17,7 +19,18 @@ export async function generateMetadata({ params }) {
 
 // @ts-ignore - Temporarily bypassing type check for deployment
 export default async function SectionPage({ params }) {
-    const { section, comments } = await fetchSectionWithComments(params.id);
+    const { section, comments } = await fetchSectionWithBestMatchedComments(params.id);
+
+    // Find exact text matches between all comments and section content
+    const allExactMatches = section ? comments.flatMap(comment =>
+        findExactTextMatches(comment.comment_text, section.section_text)
+    ) : [];
+
+    // Highlight section content with exact matches from comments
+    let highlightedSectionText = section?.section_text || '';
+    if (allExactMatches.length > 0) {
+        highlightedSectionText = highlightExactMatches(highlightedSectionText, allExactMatches, false);
+    }
 
     if (!section) {
         return (
@@ -59,9 +72,20 @@ export default async function SectionPage({ params }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="md:col-span-2">
                     <div className="openai-card p-6">
-                        <h2 className="text-lg font-medium mb-4">Section Content</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-medium">Section Content</h2>
+                            {allExactMatches.length > 0 && (
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">
+                                    {allExactMatches.length} exact match{allExactMatches.length !== 1 ? 'es' : ''} highlighted
+                                </span>
+                            )}
+                        </div>
                         <div className="openai-prose">
-                            <ReactMarkdown>{section.section_text || 'No content available for this section.'}</ReactMarkdown>
+                            {highlightedSectionText ? (
+                                <div dangerouslySetInnerHTML={{ __html: highlightedSectionText.replace(/\n/g, '<br>') }} />
+                            ) : (
+                                <div>No content available for this section.</div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -71,7 +95,7 @@ export default async function SectionPage({ params }) {
                         <h2 className="text-lg font-medium mb-4">Match Statistics</h2>
                         <div className="space-y-4">
                             <div>
-                                <div className="text-sm text-gray-500 mb-1">Comment Matches</div>
+                                <div className="text-sm text-gray-500 mb-1">Best Match Comments</div>
                                 <div className="text-2xl font-bold text-blue-600">{comments.length}</div>
                             </div>
 
@@ -88,8 +112,8 @@ export default async function SectionPage({ params }) {
                             <div className="bg-gray-50 p-3 rounded border border-gray-100">
                                 <p className="text-sm text-gray-600">
                                     {comments.length === 0
-                                        ? 'No comments have been matched to this section.'
-                                        : `This section has ${comments.length} comment match${comments.length !== 1 ? 'es' : ''}, indicating ${comments.length > 10
+                                        ? 'No comments have this section as their best match.'
+                                        : `This section is the best match for ${comments.length} comment${comments.length !== 1 ? 's' : ''}, indicating ${comments.length > 10
                                             ? 'significant public interest.'
                                             : comments.length > 5
                                                 ? 'moderate public interest.'
@@ -108,7 +132,7 @@ export default async function SectionPage({ params }) {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-4">
-                            Our AI has analyzed the comments matched to this section and identified these key points:
+                            Our AI has analyzed the comments where this section is their best match and identified these key points:
                         </p>
 
                         {comments.length > 0 ? (
@@ -139,14 +163,14 @@ export default async function SectionPage({ params }) {
                                     </div>
                                     <span>
                                         {comments.filter(c => c.has_attachments).length > 0
-                                            ? `${comments.filter(c => c.has_attachments).length} matched comments include attachments with additional details.`
-                                            : 'No matched comments include attachments.'}
+                                            ? `${comments.filter(c => c.has_attachments).length} best-matched comments include attachments with additional details.`
+                                            : 'No best-matched comments include attachments.'}
                                     </span>
                                 </li>
                             </ul>
                         ) : (
                             <div className="text-sm text-gray-500 italic">
-                                No comments matched to this section for analysis.
+                                No comments have this section as their best match for analysis.
                             </div>
                         )}
                     </div>
@@ -155,56 +179,87 @@ export default async function SectionPage({ params }) {
 
             {comments.length > 0 && (
                 <div>
-                    <h2 className="text-2xl font-semibold tracking-tight mb-4">Matched Comments</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight mb-4">Best Matched Comments</h2>
                     <p className="text-gray-600 mb-6">
-                        The following comments have been matched to this section based on content similarity. Each comment may be matched to multiple sections.
+                        The following comments have this section as their single best match. Each comment is only counted once for its most relevant section. Explicit references are highlighted in yellow.
                     </p>
 
                     <div className="openai-card">
                         <ul className="divide-y divide-gray-100">
-                            {comments.map(comment => (
-                                <li key={comment.id} className="p-6 hover:bg-gray-50 transition-colors">
-                                    <div className="mb-4 flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-medium">
-                                                {comment.commenter_name}
-                                                {comment.organization && (
-                                                    <span className="text-gray-500 ml-2">({comment.organization})</span>
-                                                )}
-                                            </h3>
-                                            <div className="text-sm text-gray-500">
-                                                {new Date(comment.comment_date).toLocaleDateString()}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center space-x-3">
-                                            <div className="openai-badge openai-badge-blue">
-                                                {(comment.similarity_score * 100).toFixed(0)}% match
-                                            </div>
-                                            {comment.has_attachments && (
-                                                <div className="openai-badge openai-badge-gray flex items-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                                    </svg>
-                                                    {comment.attachment_count} attachment{comment.attachment_count !== 1 ? 's' : ''}
+                            {comments.map(comment => {
+                                const explicitRefs = detectExplicitReferences(comment.comment_text);
+                                const exactMatches = section ? findExactTextMatches(comment.comment_text, section.section_text) : [];
+
+                                // Combine explicit references and exact matches for highlighting
+                                let highlightedText = highlightReferences(comment.comment_text, explicitRefs);
+                                if (exactMatches.length > 0) {
+                                    highlightedText = highlightExactMatches(highlightedText, exactMatches, true);
+                                }
+
+                                return (
+                                    <li key={comment.id} className="p-6 hover:bg-gray-50 transition-colors">
+                                        <div className="mb-4 flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-medium">
+                                                    {comment.commenter_name}
+                                                    {comment.organization && (
+                                                        <span className="text-gray-500 ml-2">({comment.organization})</span>
+                                                    )}
+                                                </h3>
+                                                <div className="text-sm text-gray-500">
+                                                    {new Date(comment.comment_date).toLocaleDateString()}
                                                 </div>
-                                            )}
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <div className="openai-badge openai-badge-blue">
+                                                    {(comment.similarity_score * 100).toFixed(0)}% match
+                                                </div>
+                                                {explicitRefs.length > 0 && (
+                                                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 text-sm rounded flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        {explicitRefs.length} reference{explicitRefs.length !== 1 ? 's' : ''}
+                                                    </div>
+                                                )}
+                                                {exactMatches.length > 0 && (
+                                                    <div className="px-2 py-1 bg-yellow-200 text-yellow-900 text-sm rounded flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        {exactMatches.length} exact match{exactMatches.length !== 1 ? 'es' : ''}
+                                                    </div>
+                                                )}
+                                                {comment.has_attachments && (
+                                                    <div className="openai-badge openai-badge-gray flex items-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                        </svg>
+                                                        {comment.attachment_count} attachment{comment.attachment_count !== 1 ? 's' : ''}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className="text-gray-700 mb-4 openai-prose">
-                                        <ReactMarkdown>{comment.comment_text}</ReactMarkdown>
-                                    </div>
+                                        <div className="text-gray-700 mb-4 openai-prose">
+                                            <div dangerouslySetInnerHTML={{ __html: highlightedText.replace(/\n/g, '<br>') }} />
+                                        </div>
 
-                                    <div className="flex justify-end">
-                                        <Link
-                                            href={`/comments/${comment.comment_id}`}
-                                            className="openai-button-secondary text-sm"
-                                        >
-                                            View full comment
-                                        </Link>
-                                    </div>
-                                </li>
-                            ))}
+                                        {comment.attachment_contents && comment.attachment_contents.length > 0 && (
+                                            <AttachmentContent attachments={comment.attachment_contents} />
+                                        )}
+
+                                        <div className="flex justify-end mt-4">
+                                            <Link
+                                                href={`/comments/${comment.comment_id}`}
+                                                className="openai-button-secondary text-sm"
+                                            >
+                                                View full comment
+                                            </Link>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </div>
                 </div>
