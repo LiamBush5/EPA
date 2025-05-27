@@ -4,12 +4,14 @@ import { Metadata } from 'next';
 import ReactMarkdown from 'react-markdown';
 import { detectExplicitReferences, highlightReferences, findExactTextMatches, highlightExactMatches } from '../../../lib/referenceDetection';
 import AttachmentContent from '../../../components/AttachmentContent';
+import AISummary from '../../../components/AISummary';
 
 export const dynamic = 'force-dynamic';
 
 // @ts-ignore - Temporarily bypassing type check for deployment
-export async function generateMetadata({ params }) {
-    const { section } = await fetchSectionWithBestMatchedComments(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const { section } = await fetchSectionWithBestMatchedComments(id);
 
     return {
         title: section ? `${section.section_number} ${section.section_title}` : 'Section Detail',
@@ -18,8 +20,9 @@ export async function generateMetadata({ params }) {
 }
 
 // @ts-ignore - Temporarily bypassing type check for deployment
-export default async function SectionPage({ params }) {
-    const { section, comments } = await fetchSectionWithBestMatchedComments(params.id);
+export default async function SectionPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const { section, comments } = await fetchSectionWithBestMatchedComments(id);
 
     // Find exact text matches between all comments and section content
     const allExactMatches = section ? comments.flatMap(comment =>
@@ -125,55 +128,12 @@ export default async function SectionPage({ params }) {
                         </div>
                     </div>
 
-                    <div className="openai-card p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-medium">AI Analysis</h2>
-                            <div className="openai-badge openai-badge-gray">Beta</div>
-                        </div>
-
-                        <p className="text-sm text-gray-600 mb-4">
-                            Our AI has analyzed the comments where this section is their best match and identified these key points:
-                        </p>
-
-                        {comments.length > 0 ? (
-                            <ul className="space-y-2 text-sm text-gray-700">
-                                <li className="flex items-start">
-                                    <div className="h-4 w-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mt-1 mr-2">
-                                        <span className="block h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-                                    </div>
-                                    <span>
-                                        {comments.length > 5
-                                            ? 'This section has received significant attention compared to others.'
-                                            : 'This section has received a typical level of attention.'}
-                                    </span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="h-4 w-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mt-1 mr-2">
-                                        <span className="block h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-                                    </div>
-                                    <span>
-                                        {comments.some(c => c.similarity_score > 0.8)
-                                            ? 'Some comments show very high relevance to this section.'
-                                            : 'Comments show moderate relevance to this section.'}
-                                    </span>
-                                </li>
-                                <li className="flex items-start">
-                                    <div className="h-4 w-4 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mt-1 mr-2">
-                                        <span className="block h-1.5 w-1.5 rounded-full bg-blue-600"></span>
-                                    </div>
-                                    <span>
-                                        {comments.filter(c => c.has_attachments).length > 0
-                                            ? `${comments.filter(c => c.has_attachments).length} best-matched comments include attachments with additional details.`
-                                            : 'No best-matched comments include attachments.'}
-                                    </span>
-                                </li>
-                            </ul>
-                        ) : (
-                            <div className="text-sm text-gray-500 italic">
-                                No comments have this section as their best match for analysis.
-                            </div>
-                        )}
-                    </div>
+                    <AISummary
+                        sectionId={section.section_id}
+                        sectionTitle={section.section_title}
+                        sectionNumber={section.section_number}
+                        commentCount={comments.length}
+                    />
                 </div>
             </div>
 
