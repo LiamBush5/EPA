@@ -8,12 +8,6 @@ export default function ClientNavigation() {
 
     return (
         <nav className="flex items-center space-x-1">
-            <Link
-                href={selectedProposalId ? `/document?proposal=${selectedProposalId}` : '/document'}
-                className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100/60 rounded-lg transition-all duration-200"
-            >
-                Document Structure
-            </Link>
             <a
                 href="https://www.epa.gov"
                 target="_blank"

@@ -29,7 +29,7 @@ export default async function RootLayout({
             <header className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
               <div className="max-w-7xl mx-auto px-6">
                 <div className="flex items-center justify-between h-16">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 flex-1">
                     <Link href="/" className="flex items-center space-x-3 group">
                       <div className="flex h-8 w-8 mr-1 transition-transform duration-200 group-hover:scale-105">
                         <div className="w-3 h-8 bg-gradient-to-b from-blue-500 to-blue-600 rounded-sm"></div>
@@ -42,11 +42,13 @@ export default async function RootLayout({
                     </Link>
                   </div>
 
-                  <div className="flex-1 max-w-md mx-8">
+                  <div className="flex-1 max-w-sm mx-8 flex justify-center">
                     <ClientHeader />
                   </div>
 
-                  <ClientNavigation />
+                  <div className="flex-1 flex justify-end">
+                    <ClientNavigation />
+                  </div>
                 </div>
               </div>
             </header>
