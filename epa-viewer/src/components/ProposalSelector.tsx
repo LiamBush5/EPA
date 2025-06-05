@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Proposal } from '../lib/supabase';
 
 interface ProposalSelectorProps {
@@ -9,100 +9,108 @@ interface ProposalSelectorProps {
     onProposalChange: (proposalId: string) => void;
 }
 
-export default function ProposalSelector({
-    proposals,
-    selectedProposalId,
-    onProposalChange
-}: ProposalSelectorProps) {
+const ProposalSelector = ({ proposals, selectedProposalId, onProposalChange }: ProposalSelectorProps) => {
     const [isOpen, setIsOpen] = useState(false);
-
     const selectedProposal = proposals.find(p => p.proposal_id === selectedProposalId);
 
+    const getStatusColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case 'active': return 'bg-green-100 text-green-700 border-green-200';
+            case 'closed': return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'draft': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            default: return 'bg-blue-100 text-blue-700 border-blue-200';
+        }
+    };
+
+    const formatDocketId = (docketId: string) => {
+        // Shorten the docket ID by removing EPA-HQ- prefix
+        return docketId.replace('EPA-HQ-', '');
+    };
+
     return (
-        <div className="relative inline-block text-left">
-            <div>
-                <button
-                    type="button"
-                    className="inline-flex w-full justify-between items-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 min-w-64"
-                    onClick={() => setIsOpen(!isOpen)}
-                    aria-expanded={isOpen}
-                    aria-haspopup="true"
-                >
-                    <div className="text-left flex-1">
-                        {selectedProposal ? (
-                            <div>
-                                <div className="font-medium truncate">
-                                    {selectedProposal.docket_id}
-                                </div>
-                                <div className="text-xs text-gray-500 truncate">
-                                    {selectedProposal.title.length > 50
-                                        ? selectedProposal.title.substring(0, 47) + '...'
-                                        : selectedProposal.title
-                                    }
-                                </div>
-                            </div>
-                        ) : (
-                            <span className="text-gray-500">Select a proposal...</span>
-                        )}
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-white border border-gray-200/60 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300/60 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            >
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     </div>
+
+                    {selectedProposal ? (
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center space-x-2 mb-0.5">
+                                <span className="text-sm font-medium text-gray-900 truncate">
+                                    {formatDocketId(selectedProposal.docket_id)}
+                                </span>
+                                <span className={`px-2 py-0.5 text-xs font-medium rounded-md border ${getStatusColor(selectedProposal.status)}`}>
+                                    {selectedProposal.status}
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-600 truncate">
+                                {selectedProposal.title.trim()}
+                            </p>
+                        </div>
+                    ) : (
+                        <span className="text-sm text-gray-500">Select a proposal</span>
+                    )}
+                </div>
+
+                <div className="flex-shrink-0 ml-2">
                     <svg
-                        className={`-mr-1 h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                     >
-                        <path
-                            fillRule="evenodd"
-                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                            clipRule="evenodd"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                </button>
-            </div>
+                </div>
+            </button>
 
             {isOpen && (
-                <div className="absolute right-0 z-10 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                    <div className="py-1" role="menu" aria-orientation="vertical">
-                        {proposals.map((proposal) => (
-                            <button
-                                key={proposal.proposal_id}
-                                className={`group flex w-full items-start px-4 py-3 text-sm text-left hover:bg-gray-100 ${selectedProposalId === proposal.proposal_id ? 'bg-blue-50 text-blue-900' : 'text-gray-900'
-                                    }`}
-                                role="menuitem"
-                                onClick={() => {
-                                    onProposalChange(proposal.proposal_id);
-                                    setIsOpen(false);
-                                }}
-                            >
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-medium">{proposal.docket_id}</span>
-                                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${proposal.status === 'closed'
-                                            ? 'bg-gray-100 text-gray-800'
-                                            : 'bg-green-100 text-green-800'
-                                            }`}>
+                <>
+                    <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setIsOpen(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200/60 rounded-xl shadow-lg backdrop-blur-xl z-20 overflow-hidden">
+                        <div className="p-2 max-h-80 overflow-y-auto">
+                            {proposals.map((proposal) => (
+                                <button
+                                    key={proposal.proposal_id}
+                                    onClick={() => {
+                                        onProposalChange(proposal.proposal_id);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`w-full text-left p-3 rounded-lg transition-all duration-150 hover:bg-gray-50 focus:outline-none focus:bg-gray-50 ${selectedProposalId === proposal.proposal_id ? 'bg-blue-50 border border-blue-200' : ''
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-gray-900">
+                                            {formatDocketId(proposal.docket_id)}
+                                        </span>
+                                        <span className={`px-2 py-0.5 text-xs font-medium rounded-md border ${getStatusColor(proposal.status)}`}>
                                             {proposal.status}
                                         </span>
                                     </div>
-                                    <div className="text-xs text-gray-600 line-clamp-2">
-                                        {proposal.title}
-                                    </div>
+                                    <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                                        {proposal.title.trim()}
+                                    </p>
                                     {proposal.description && (
-                                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">
                                             {proposal.description}
-                                        </div>
+                                        </p>
                                     )}
-                                </div>
-                                {selectedProposalId === proposal.proposal_id && (
-                                    <svg className="h-4 w-4 text-blue-600 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                )}
-                            </button>
-                        ))}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                </>
             )}
         </div>
     );
-}
+};
+
+export default ProposalSelector;

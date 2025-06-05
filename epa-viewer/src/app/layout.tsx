@@ -26,20 +26,26 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ProposalProvider initialProposals={proposals}>
           <div className="min-h-screen flex flex-col">
-            <header className="border-b border-gray-100 bg-white w-full">
-              <div className="max-w-[1200px] mx-auto px-4 flex justify-between items-center py-3">
-                <div className="flex items-center">
-                  <div className="flex h-8 w-8 mr-3">
-                    <div className="w-3 h-8 openai-gradient rounded-sm"></div>
-                    <div className="w-1 h-8"></div>
-                    <div className="w-3 h-8 openai-gradient rounded-sm opacity-70"></div>
+            <header className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
+              <div className="max-w-7xl mx-auto px-6">
+                <div className="flex items-center justify-between h-16">
+                  <div className="flex items-center space-x-3">
+                    <Link href="/" className="flex items-center space-x-3 group">
+                      <div className="flex h-8 w-8 mr-1 transition-transform duration-200 group-hover:scale-105">
+                        <div className="w-3 h-8 bg-gradient-to-b from-blue-500 to-blue-600 rounded-sm"></div>
+                        <div className="w-1 h-8"></div>
+                        <div className="w-3 h-8 bg-gradient-to-b from-blue-400 to-blue-500 rounded-sm opacity-70"></div>
+                      </div>
+                      <h1 className="text-xl font-semibold tracking-tight text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
+                        EPA Document Analyzer
+                      </h1>
+                    </Link>
                   </div>
-                  <Link href="/" className="text-xl font-semibold tracking-tight">
-                    EPA Document Analyzer
-                  </Link>
-                </div>
-                <div className="flex items-center space-x-5">
-                  <ClientHeader />
+
+                  <div className="flex-1 max-w-md mx-8">
+                    <ClientHeader />
+                  </div>
+
                   <ClientNavigation />
                 </div>
               </div>
