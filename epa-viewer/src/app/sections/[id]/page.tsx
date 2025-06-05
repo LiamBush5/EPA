@@ -49,10 +49,10 @@ export default async function SectionPage({
                 <h2 className="text-2xl font-semibold text-gray-800 mb-4">Section Not Found</h2>
                 <p className="text-gray-600 mb-6">The section you are looking for does not exist or has been removed.</p>
                 <Link
-                    href={proposalId ? `/document?proposal=${proposalId}` : '/document'}
+                    href={proposalId ? `/?proposal=${proposalId}` : '/'}
                     className="openai-button"
                 >
-                    Back to Document
+                    Back to Proposal
                 </Link>
             </div>
         );
@@ -62,13 +62,13 @@ export default async function SectionPage({
         <div className="space-y-12">
             <div className="flex flex-col items-start">
                 <Link
-                    href={proposalId ? `/document?proposal=${proposalId}` : '/document'}
+                    href={proposalId ? `/?proposal=${proposalId}` : '/'}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-6 flex items-center"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    Back to document structure
+                    Back to proposal overview
                 </Link>
 
                 <div className="flex items-center space-x-3 mb-2">
