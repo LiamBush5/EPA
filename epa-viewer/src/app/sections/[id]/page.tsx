@@ -20,8 +20,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 // @ts-ignore - Temporarily bypassing type check for deployment
-export default async function SectionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SectionPage({
+    params,
+    searchParams
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ proposal?: string }>;
+}) {
     const { id } = await params;
+    const resolvedSearchParams = await searchParams;
+    const proposalId = resolvedSearchParams.proposal;
     const { section, comments } = await fetchSectionWithBestMatchedComments(id);
 
     // Find exact text matches between all comments and section content
@@ -40,7 +48,10 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
             <div className="text-center py-12">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-4">Section Not Found</h2>
                 <p className="text-gray-600 mb-6">The section you are looking for does not exist or has been removed.</p>
-                <Link href="/document" className="openai-button">
+                <Link
+                    href={proposalId ? `/document?proposal=${proposalId}` : '/document'}
+                    className="openai-button"
+                >
                     Back to Document
                 </Link>
             </div>
@@ -51,7 +62,7 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
         <div className="space-y-12">
             <div className="flex flex-col items-start">
                 <Link
-                    href="/document"
+                    href={proposalId ? `/document?proposal=${proposalId}` : '/document'}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-6 flex items-center"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -211,7 +222,7 @@ export default async function SectionPage({ params }: { params: Promise<{ id: st
 
                                         <div className="flex justify-end mt-4">
                                             <Link
-                                                href={`/comments/${comment.comment_id}`}
+                                                href={proposalId ? `/comments/${comment.comment_id}?proposal=${proposalId}` : `/comments/${comment.comment_id}`}
                                                 className="openai-button-secondary text-sm"
                                             >
                                                 View full comment

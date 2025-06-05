@@ -1,14 +1,52 @@
 import Link from 'next/link';
-import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../../lib/supabase';
+import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments, fetchProposal } from '../../lib/supabase';
 import { findSingleBestMatch } from '../../lib/singleMatchLogic';
 import DocumentStructure from '../../components/DocumentStructure';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DocumentPage() {
-    const sections = await fetchDocumentSections();
-    const rawMatches = await fetchCommentSectionMatches();
-    const comments = await fetchComments();
+interface DocumentPageProps {
+    searchParams: Promise<{ proposal?: string }>;
+}
+
+export default async function DocumentPage({ searchParams }: DocumentPageProps) {
+    const resolvedSearchParams = await searchParams;
+    const proposalId = resolvedSearchParams.proposal;
+
+    if (!proposalId) {
+        return (
+            <div className="space-y-10">
+                <div className="text-center py-20">
+                    <h2 className="text-xl text-gray-600">No proposal selected</h2>
+                    <p className="text-gray-500 mt-2">Please select a proposal from the dropdown above.</p>
+                    <Link href="/" className="text-blue-600 hover:underline mt-4 inline-block">
+                        ← Return to dashboard
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const [sections, rawMatches, comments, proposal] = await Promise.all([
+        fetchDocumentSections(proposalId),
+        fetchCommentSectionMatches(proposalId),
+        fetchComments(proposalId),
+        fetchProposal(proposalId)
+    ]);
+
+    if (!proposal) {
+        return (
+            <div className="space-y-10">
+                <div className="text-center py-20">
+                    <h2 className="text-xl text-gray-600">Proposal not found</h2>
+                    <p className="text-gray-500 mt-2">The selected proposal could not be found.</p>
+                    <Link href="/" className="text-blue-600 hover:underline mt-4 inline-block">
+                        ← Return to dashboard
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     // Apply single best match logic to each comment
     const singleBestMatches = comments
@@ -56,7 +94,7 @@ export default async function DocumentPage() {
         <div className="space-y-10">
             <div className="flex flex-col items-start">
                 <Link
-                    href="/"
+                    href={`/?proposal=${proposalId}`}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-8 flex items-center"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,6 +102,14 @@ export default async function DocumentPage() {
                     </svg>
                     Back to dashboard
                 </Link>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 w-full">
+                    <h2 className="font-semibold text-blue-900">{proposal.docket_id}</h2>
+                    <p className="text-blue-800 text-sm">{proposal.title}</p>
+                    {proposal.description && (
+                        <p className="text-blue-700 text-xs mt-1">{proposal.description}</p>
+                    )}
+                </div>
 
                 <h1 className="text-3xl font-semibold tracking-tight mb-4">Document Structure Analysis</h1>
                 <p className="text-gray-600 mb-8 max-w-3xl">
@@ -95,7 +141,7 @@ export default async function DocumentPage() {
             </div>
 
             <div className="mt-10">
-                <DocumentStructure sections={sections} commentCounts={commentCountBySection} />
+                <DocumentStructure sections={sections} commentCounts={commentCountBySection} proposalId={proposalId} />
             </div>
 
             <div className="openai-card p-8 mt-10">

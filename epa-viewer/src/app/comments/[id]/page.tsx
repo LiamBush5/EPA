@@ -20,16 +20,32 @@ export async function generateMetadata({ params }) {
 }
 
 // @ts-ignore - Temporarily bypassing type check for deployment
-export default async function CommentPage({ params }) {
-    const { comment, sections } = await fetchCommentWithSections(params.id);
-    const allSections = await fetchDocumentSections(); // Need all sections for reference lookup
+export default async function CommentPage({
+    params,
+    searchParams
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ proposal?: string }>;
+}) {
+    const { id } = await params;
+    const resolvedSearchParams = await searchParams;
+    const proposalId = resolvedSearchParams.proposal;
+    const { comment, sections } = await fetchCommentWithSections(id);
+
+    // Fetch sections for the specific proposal if available, or all sections
+    const allSections = proposalId
+        ? await fetchDocumentSections(proposalId)
+        : await fetchDocumentSections();
 
     if (!comment) {
         return (
             <div className="text-center py-12">
                 <h2 className="text-2xl font-semibold text-gray-800 mb-4">Comment Not Found</h2>
                 <p className="text-gray-600 mb-6">The comment you are looking for does not exist or has been removed.</p>
-                <Link href="/" className="openai-button">
+                <Link
+                    href={proposalId ? `/?proposal=${proposalId}` : '/'}
+                    className="openai-button"
+                >
                     Back to Dashboard
                 </Link>
             </div>
@@ -82,7 +98,7 @@ export default async function CommentPage({ params }) {
         <div className="space-y-12">
             <div className="flex flex-col items-start">
                 <Link
-                    href="/"
+                    href={proposalId ? `/?proposal=${proposalId}` : '/'}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-6 flex items-center"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,7 +318,7 @@ export default async function CommentPage({ params }) {
 
                         <div className="border-t border-gray-100 pt-4 mt-4">
                             <Link
-                                href={`/sections/${bestMatch.section_id}`}
+                                href={proposalId ? `/sections/${bestMatch.section_id}?proposal=${proposalId}` : `/sections/${bestMatch.section_id}`}
                                 className="openai-button inline-flex items-center"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

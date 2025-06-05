@@ -151,17 +151,29 @@ def filter_hierarchical_matches(matches, section_map, ancestor_map):
 
     return filtered_matches
 
-def match_comments_to_sections(threshold=0.75, max_matches=5):
+def match_comments_to_sections(proposal_id=None, threshold=0.75, max_matches=5):
     """Match EPA comments to document sections based on vector similarity"""
-    print("Fetching comments from Supabase...")
-    comments_response = sb_client.table('epa_comments').select('*').execute()
-    comments = comments_response.data
 
-    print("Fetching document sections from Supabase...")
-    sections_response = sb_client.table('document_sections').select('*').execute()
+    if proposal_id:
+        print(f"Fetching comments for proposal {proposal_id} from Supabase...")
+        comments_response = sb_client.table('epa_comments').select('*').eq('proposal_id', proposal_id).execute()
+
+        print(f"Fetching document sections for proposal {proposal_id} from Supabase...")
+        sections_response = sb_client.table('document_sections').select('*').eq('proposal_id', proposal_id).execute()
+    else:
+        print("Fetching all comments from Supabase...")
+        comments_response = sb_client.table('epa_comments').select('*').execute()
+
+        print("Fetching all document sections from Supabase...")
+        sections_response = sb_client.table('document_sections').select('*').execute()
+
+    comments = comments_response.data
     sections = sections_response.data
 
     print(f"Matching {len(comments)} comments to {len(sections)} sections...")
+
+    if proposal_id:
+        print(f"All matching will be within proposal: {proposal_id}")
 
     # Build section hierarchy maps
     print("Building section hierarchy maps...")
@@ -175,6 +187,7 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
         # Use the string comment_id field (not the UUID id field)
         comment_str_id = comment['comment_id']
         comment_embedding = comment['embedding']
+        comment_proposal_id = comment.get('proposal_id')
 
         # Find matching sections
         section_matches = []
@@ -183,6 +196,11 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
             section_title = section.get('section_title', '')
             section_number = section.get('section_number', '')
             section_embedding = section['embedding']
+            section_proposal_id = section.get('proposal_id')
+
+            # Skip if proposal_ids don't match (additional safety check)
+            if comment_proposal_id and section_proposal_id and comment_proposal_id != section_proposal_id:
+                continue
 
             # Calculate similarity
             similarity = vector_search_similarity(comment_embedding, section_embedding)
@@ -207,7 +225,8 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
             all_matches.append({
                 'comment_id': comment_str_id,  # Use string comment ID for foreign key
                 'section_id': match['section_id'],
-                'similarity_score': match['similarity_score']
+                'similarity_score': match['similarity_score'],
+                'proposal_id': proposal_id if proposal_id else comment_proposal_id
             })
 
     print(f"Found {len(all_matches)} raw comment-section matches above threshold {threshold}")
@@ -217,20 +236,28 @@ def match_comments_to_sections(threshold=0.75, max_matches=5):
     print(f"After hierarchical filtering: {len(filtered_matches)} unique matches")
 
     # Upload matches to Supabase
-    upload_matches_to_supabase(filtered_matches)
+    upload_matches_to_supabase(filtered_matches, proposal_id)
 
     return filtered_matches
 
-def upload_matches_to_supabase(matches, batch_size=50):
+def upload_matches_to_supabase(matches, proposal_id=None, batch_size=50):
     """Upload comment-section matches to Supabase"""
     print(f"Uploading {len(matches)} matches to Supabase...")
 
-    # First, clear any existing matches
-    try:
-        sb_client.table('comment_section_matches').delete().neq('comment_id', 'NO_MATCH_DUMMY_VALUE').execute()
-        print("Deleted existing matches")
-    except Exception as e:
-        print(f"Error deleting existing matches: {e}")
+    # Delete existing matches for this specific proposal only
+    if proposal_id:
+        try:
+            result = sb_client.table('comment_section_matches').delete().eq('proposal_id', proposal_id).execute()
+            print(f"Deleted existing matches for proposal {proposal_id}")
+        except Exception as e:
+            print(f"Error deleting existing matches for proposal {proposal_id}: {e}")
+    else:
+        # If no proposal_id specified, delete all matches (original behavior)
+        try:
+            sb_client.table('comment_section_matches').delete().neq('comment_id', 'NO_MATCH_DUMMY_VALUE').execute()
+            print("Deleted all existing matches")
+        except Exception as e:
+            print(f"Error deleting existing matches: {e}")
 
     # Process in batches
     for i in tqdm(range(0, len(matches), batch_size), desc="Uploading match batches"):
@@ -299,8 +326,45 @@ def analyze_match_results():
         print(f"{i}. {info['section_number']} {info['section_title']}: {count} comments")
 
 if __name__ == "__main__":
-    # Match comments to sections
-    matches = match_comments_to_sections(threshold=0.70)
+    print("Starting automatic matching for all proposals...")
 
-    # Analyze results
+    # Get all unique proposal IDs from both comments and sections
+    print("Fetching all unique proposal IDs...")
+
+    # Get proposal IDs from comments
+    comments_proposals_response = sb_client.table('epa_comments').select('proposal_id').execute()
+    comment_proposal_ids = set(comment['proposal_id'] for comment in comments_proposals_response.data if comment.get('proposal_id'))
+
+    # Get proposal IDs from sections
+    sections_proposals_response = sb_client.table('document_sections').select('proposal_id').execute()
+    section_proposal_ids = set(section['proposal_id'] for section in sections_proposals_response.data if section.get('proposal_id'))
+
+    # Find proposal IDs that exist in both comments and sections
+    common_proposal_ids = comment_proposal_ids.intersection(section_proposal_ids)
+
+    print(f"Found {len(comment_proposal_ids)} unique proposal IDs in comments")
+    print(f"Found {len(section_proposal_ids)} unique proposal IDs in sections")
+    print(f"Found {len(common_proposal_ids)} proposal IDs with both comments and sections")
+
+    if not common_proposal_ids:
+        print("No proposal IDs found with both comments and sections. Nothing to match.")
+        exit()
+
+    # Process each proposal ID
+    all_matches = []
+    for i, proposal_id in enumerate(common_proposal_ids, 1):
+        print(f"\n--- Processing proposal {i}/{len(common_proposal_ids)}: {proposal_id} ---")
+
+        # Match comments to sections within this proposal
+        matches = match_comments_to_sections(proposal_id=proposal_id, threshold=0.70)
+        all_matches.extend(matches)
+
+        print(f"Completed proposal {proposal_id}: {len(matches)} matches")
+
+    print(f"\n=== SUMMARY ===")
+    print(f"Processed {len(common_proposal_ids)} proposals")
+    print(f"Total matches across all proposals: {len(all_matches)}")
+
+    # Analyze results across all proposals
+    print("\nAnalyzing results across all proposals...")
     analyze_match_results()

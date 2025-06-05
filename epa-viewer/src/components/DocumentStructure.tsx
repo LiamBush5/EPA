@@ -4,9 +4,10 @@ import { DocumentSection } from '../lib/supabase';
 interface DocumentStructureProps {
     sections: DocumentSection[];
     commentCounts: Record<string, number>;
+    proposalId?: string;
 }
 
-const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) => {
+const DocumentStructure = ({ sections, commentCounts, proposalId }: DocumentStructureProps) => {
     // Separate special sections that should appear at the end
     const specialSections = ['REGULATORY_TEXT', 'FOOTNOTES'];
 
@@ -67,6 +68,11 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
 
     const sectionTree = buildTree(mainSections);
 
+    // Create link with optional proposal parameter
+    const createSectionLink = (sectionId: string) => {
+        return proposalId ? `/sections/${sectionId}?proposal=${proposalId}` : `/sections/${sectionId}`;
+    };
+
     // Recursive component to render the tree
     const renderSectionTree = (tree: Record<string, any>, level: number = 0) => {
         return (
@@ -79,7 +85,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
                         <li key={section.section_id} className={`py-2 ${level > 0 ? 'border-l-2 border-gray-100 pl-4' : ''}`}>
                             <div className="flex items-center">
                                 <Link
-                                    href={`/sections/${section.section_id}`}
+                                    href={createSectionLink(section.section_id)}
                                     className="group flex-1 flex items-center text-gray-900 hover:text-blue-600 transition-colors"
                                 >
                                     {hasChildren && (
@@ -121,7 +127,7 @@ const DocumentStructure = ({ sections, commentCounts }: DocumentStructureProps) 
                             <li key={section.section_id} className="py-2">
                                 <div className="flex items-center">
                                     <Link
-                                        href={`/sections/${section.section_id}`}
+                                        href={createSectionLink(section.section_id)}
                                         className="group flex-1 flex items-center text-gray-900 hover:text-blue-600 transition-colors"
                                     >
                                         <span className="text-sm text-gray-500 mr-2">{section.section_number}</span>

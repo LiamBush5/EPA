@@ -49,7 +49,7 @@ def get_embedding(text):
             # Re-raise if it's a different error
             raise
 
-def upsert_documents_to_supabase(documents, batch_size=10):
+def upsert_documents_to_supabase(documents, proposal_id, batch_size=10):
     """Insert documents into Supabase with embeddings"""
     for i in tqdm(range(0, len(documents), batch_size), desc="Uploading batches to Supabase"):
         batch = documents[i:i+batch_size]
@@ -73,7 +73,8 @@ def upsert_documents_to_supabase(documents, batch_size=10):
                 'attachment_contents': json.dumps(doc.get('attachment_contents', [])),
                 'combined_text': doc.get('combined_text', doc['comment_text']),
                 'source_url': doc.get('source_url', ''),
-                'embedding': embedding
+                'embedding': embedding,
+                'proposal_id': proposal_id
             }
             rows.append(row)
 
@@ -85,7 +86,7 @@ def upsert_documents_to_supabase(documents, batch_size=10):
         except Exception as e:
             print(f"Error uploading batch: {e}")
 
-def insert_document_sections(sections, batch_size=10):
+def insert_document_sections(sections, proposal_id, batch_size=10):
     """Insert document sections into Supabase with embeddings"""
     for i in tqdm(range(0, len(sections), batch_size), desc="Uploading section batches to Supabase"):
         batch = sections[i:i+batch_size]
@@ -103,7 +104,8 @@ def insert_document_sections(sections, batch_size=10):
                 'section_text': section['section_text'],
                 'parent_section_id': section.get('parent_section_id'),
                 'hierarchy_level': section.get('hierarchy_level', 1),
-                'hierarchy_path': section.get('hierarchy_path', '')
+                'hierarchy_path': section.get('hierarchy_path', ''),
+                'proposal_id': proposal_id
             }
 
             # Only add embedding if it's not empty
@@ -122,8 +124,11 @@ def insert_document_sections(sections, batch_size=10):
 
 def load_document_sections():
     """Load document sections from JSON file and upload to Supabase"""
-    sections_file = 'output/epa_sections_with_intro.json'
+    sections_file = 'processed/epa_document_sections_fixed.json'
+    proposal_id = 'f8a686ba-fe45-48b7-a85f-df31540bb7d9'
+
     print(f"Loading document sections from {sections_file}")
+    print(f"Using proposal ID: {proposal_id}")
 
     try:
         with open(sections_file, 'r') as f:
@@ -131,8 +136,8 @@ def load_document_sections():
 
         print(f"Found {len(sections)} document sections to load")
 
-        # Upload sections to Supabase
-        insert_document_sections(sections)
+        # Upload sections to Supabase with the specific proposal ID
+        insert_document_sections(sections, proposal_id)
 
         print("Document sections uploaded successfully!")
         return True
@@ -150,14 +155,18 @@ def main():
     print("3. Load both document sections and comments")
     print("4. Exit")
 
+    # Define the proposal ID for both document sections and comments
+    proposal_id = 'f8a686ba-fe45-48b7-a85f-df31540bb7d9'
+
     choice = input("Enter your choice (1-4): ")
 
     if choice == '1':
         load_document_sections()
     elif choice == '2':
         # Load the enhanced comments with attachment content
-        comments_file = 'processed/epa_comments_with_attachment_content.json'
+        comments_file = 'processed/epa_comments_with_attachment_content_222.json'
         print(f"Loading comments from {comments_file}")
+        print(f"Using proposal ID: {proposal_id}")
 
         with open(comments_file, 'r') as f:
             comments = json.load(f)
@@ -169,15 +178,16 @@ def main():
         print(f"Of these, {comments_with_attachments} comments have attachments")
 
         # Upload comments to Supabase
-        upsert_documents_to_supabase(comments)
+        upsert_documents_to_supabase(comments, proposal_id)
 
         print("Comments uploaded successfully!")
     elif choice == '3':
         success = load_document_sections()
         if success:
             # Load comments after sections are loaded
-            comments_file = 'processed/epa_comments_with_attachment_content.json'
+            comments_file = 'processed/epa_comments_with_attachment_content_222.json'
             print(f"Loading comments from {comments_file}")
+            print(f"Using proposal ID: {proposal_id}")
 
             with open(comments_file, 'r') as f:
                 comments = json.load(f)
@@ -189,7 +199,7 @@ def main():
             print(f"Of these, {comments_with_attachments} comments have attachments")
 
             # Upload comments to Supabase
-            upsert_documents_to_supabase(comments)
+            upsert_documents_to_supabase(comments, proposal_id)
 
             print("Comments uploaded successfully!")
     elif choice == '4':

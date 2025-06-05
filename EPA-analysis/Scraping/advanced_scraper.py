@@ -360,8 +360,8 @@ def main():
     parser.add_argument(
         "--urls",
         nargs="+",
-        default=["https://www.regulations.gov/document/EPA-HQ-OLEM-2017-0463-0001/comment"],
-        help="URLs to scrape (default: EPA-HQ-OLEM-2017-0463-0001 comments)"
+        default=["https://www.regulations.gov/document/EPA-HQ-OAR-2017-0015-0172/comment"],
+        help="URLs to scrape (default: EPA-HQ-OAR-2017-0015-0172 comments)"
     )
     parser.add_argument(
         "--output-dir",
