@@ -225,9 +225,9 @@ export default function ProposalAwarePage() {
                             </div>
                             <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
                                 <div className="text-lg font-bold text-orange-600 mb-1">
-                                    EPA
+                                    {officeInfo.office_code}
                                 </div>
-                                <div className="text-sm font-medium text-gray-600">Agency</div>
+                                <div className="text-sm font-medium text-gray-600">Office</div>
                             </div>
                         </div>
                     </div>
@@ -248,8 +248,8 @@ export default function ProposalAwarePage() {
                                 <p className="text-gray-900 font-medium">{selectedProposal.agency}</p>
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Agency</label>
-                                <p className="text-gray-900 font-medium">{officeInfo.office}</p>
+                                <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Office</label>
+                                <p className="text-gray-900 font-medium">{officeInfo.office_code}</p>
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-gray-500 uppercase tracking-wide">Proposal Date</label>
