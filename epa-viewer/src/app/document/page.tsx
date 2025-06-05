@@ -1,19 +1,71 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments, fetchProposal } from '../../lib/supabase';
+import { useProposal } from '../../components/ProposalProvider';
+import { fetchDocumentSections, fetchCommentSectionMatches, fetchComments } from '../../lib/supabase';
 import { findSingleBestMatch } from '../../lib/singleMatchLogic';
 import DocumentStructure from '../../components/DocumentStructure';
+import { DocumentSection, Comment, CommentSectionMatch } from '../../lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-interface DocumentPageProps {
-    searchParams: Promise<{ proposal?: string }>;
-}
+export default function DocumentPage() {
+    const { selectedProposalId, selectedProposal, isLoading } = useProposal();
+    const [sections, setSections] = useState<DocumentSection[]>([]);
+    const [rawMatches, setRawMatches] = useState<CommentSectionMatch[]>([]);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [loading, setLoading] = useState(true);
 
-export default async function DocumentPage({ searchParams }: DocumentPageProps) {
-    const resolvedSearchParams = await searchParams;
-    const proposalId = resolvedSearchParams.proposal;
+    useEffect(() => {
+        if (!selectedProposalId) {
+            setLoading(false);
+            return;
+        }
 
-    if (!proposalId) {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                const [sectionsData, rawMatchesData, commentsData] = await Promise.all([
+                    fetchDocumentSections(selectedProposalId),
+                    fetchCommentSectionMatches(selectedProposalId),
+                    fetchComments(selectedProposalId)
+                ]);
+
+                setSections(sectionsData);
+                setRawMatches(rawMatchesData);
+                setComments(commentsData);
+
+                // Debug log for proposal switching
+                console.log(`Loaded data for proposal ${selectedProposalId}:`, {
+                    sections: sectionsData.length,
+                    comments: commentsData.length,
+                    matches: rawMatchesData.length,
+                    sectionProposals: [...new Set(sectionsData.map(s => s.proposal_id))],
+                    commentProposals: [...new Set(commentsData.map(c => c.proposal_id))],
+                    matchProposals: [...new Set(rawMatchesData.map(m => m.proposal_id))]
+                });
+            } catch (error) {
+                console.error('Error loading document data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [selectedProposalId]);
+
+    if (loading || isLoading) {
+        return (
+            <div className="space-y-10">
+                <div className="flex justify-center items-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!selectedProposalId) {
         return (
             <div className="space-y-10">
                 <div className="text-center py-20">
@@ -27,14 +79,7 @@ export default async function DocumentPage({ searchParams }: DocumentPageProps) 
         );
     }
 
-    const [sections, rawMatches, comments, proposal] = await Promise.all([
-        fetchDocumentSections(proposalId),
-        fetchCommentSectionMatches(proposalId),
-        fetchComments(proposalId),
-        fetchProposal(proposalId)
-    ]);
-
-    if (!proposal) {
+    if (!selectedProposal) {
         return (
             <div className="space-y-10">
                 <div className="text-center py-20">
@@ -51,12 +96,29 @@ export default async function DocumentPage({ searchParams }: DocumentPageProps) 
     // Apply single best match logic to each comment
     const singleBestMatches = comments
         .map(comment => {
+            // Validate that comment belongs to current proposal
+            if (comment.proposal_id !== selectedProposalId) {
+                console.warn(`Comment ${comment.comment_id} has proposal_id ${comment.proposal_id} but selected proposal is ${selectedProposalId}`);
+                return null;
+            }
+
             // Get all matches for this comment
-            const commentMatches = rawMatches.filter(match => match.comment_id === comment.comment_id);
+            const commentMatches = rawMatches.filter(match => {
+                // Ensure match belongs to same proposal
+                if (match.proposal_id !== selectedProposalId) {
+                    console.warn(`Match for comment ${comment.comment_id} has proposal_id ${match.proposal_id} but selected proposal is ${selectedProposalId}`);
+                    return false;
+                }
+                return match.comment_id === comment.comment_id;
+            });
 
             // Convert to the format expected by findSingleBestMatch
             const sectionsWithScores = commentMatches.map(match => {
                 const section = sections.find(s => s.section_id === match.section_id);
+                if (section && section.proposal_id !== selectedProposalId) {
+                    console.warn(`Section ${section.section_id} has proposal_id ${section.proposal_id} but selected proposal is ${selectedProposalId}`);
+                    return null;
+                }
                 return section ? {
                     ...section,
                     similarity_score: match.similarity_score,
@@ -94,7 +156,7 @@ export default async function DocumentPage({ searchParams }: DocumentPageProps) 
         <div className="space-y-10">
             <div className="flex flex-col items-start">
                 <Link
-                    href={`/?proposal=${proposalId}`}
+                    href={`/?proposal=${selectedProposalId}`}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-8 flex items-center"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -104,10 +166,10 @@ export default async function DocumentPage({ searchParams }: DocumentPageProps) 
                 </Link>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 w-full">
-                    <h2 className="font-semibold text-blue-900">{proposal.docket_id}</h2>
-                    <p className="text-blue-800 text-sm">{proposal.title}</p>
-                    {proposal.description && (
-                        <p className="text-blue-700 text-xs mt-1">{proposal.description}</p>
+                    <h2 className="font-semibold text-blue-900">{selectedProposal.docket_id}</h2>
+                    <p className="text-blue-800 text-sm">{selectedProposal.title}</p>
+                    {selectedProposal.description && (
+                        <p className="text-blue-700 text-xs mt-1">{selectedProposal.description}</p>
                     )}
                 </div>
 
@@ -141,7 +203,7 @@ export default async function DocumentPage({ searchParams }: DocumentPageProps) 
             </div>
 
             <div className="mt-10">
-                <DocumentStructure sections={sections} commentCounts={commentCountBySection} proposalId={proposalId} />
+                <DocumentStructure sections={sections} commentCounts={commentCountBySection} proposalId={selectedProposalId} />
             </div>
 
             <div className="openai-card p-8 mt-10">

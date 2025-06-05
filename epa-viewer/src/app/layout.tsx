@@ -5,6 +5,7 @@ import Link from "next/link";
 import { fetchProposals } from "../lib/supabase";
 import { ProposalProvider } from "../components/ProposalProvider";
 import ClientHeader from "../components/ClientHeader";
+import ClientNavigation from "../components/ClientNavigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,14 +40,7 @@ export default async function RootLayout({
                 </div>
                 <div className="flex items-center space-x-5">
                   <ClientHeader />
-                  <nav className="flex items-center space-x-5">
-                    <Link href="/document" className="text-sm text-gray-600 hover:text-gray-900">
-                      Document Structure
-                    </Link>
-                    <a href="https://www.epa.gov" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-600 hover:text-gray-900">
-                      EPA Website
-                    </a>
-                  </nav>
+                  <ClientNavigation />
                 </div>
               </div>
             </header>
