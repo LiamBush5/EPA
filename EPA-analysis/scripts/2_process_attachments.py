@@ -25,8 +25,8 @@ def download_and_process_attachments():
     os.makedirs('../processed', exist_ok=True)
 
     # Load the comment data
-    input_file = '../data/raw/epa_comments_scraped.json'
-    output_file = '../processed/comments_with_attachments.json'
+    input_file = '../processed/epa_comments_with_attachment_content_correct.json'
+    output_file = '../processed/comments_with_attachments_updated.json'
 
     with open(input_file, 'r') as f:
         comments = json.load(f)
