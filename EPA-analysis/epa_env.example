@@ -1,6 +1,0 @@
-# OpenAI API Key for embeddings and GPT processing
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Supabase Connection Details
-SUPABASE_URL=your_supabase_url_here
-SUPABASE_SERVICE_KEY=your_supabase_service_key_here
